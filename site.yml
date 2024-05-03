@@ -1,0 +1,5 @@
+---
+- name: Configure JBoss EAP Server
+  hosts: appservers
+  roles:
+    - eap

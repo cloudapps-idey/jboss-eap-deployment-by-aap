@@ -1,0 +1,4 @@
+---
+# vars file for roles/apache
+apache_user: apache
+apache_group: apache

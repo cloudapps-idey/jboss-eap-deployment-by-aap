@@ -1,0 +1,77 @@
+---
+# tasks file for roles/apache
+- name: Ensure HTTPD package & other tools are present
+  ansible.builtin.dnf:
+    name: httpd, unzip, wget
+    state: present
+
+- name: Check if HTTPD service exists
+  stat: path=/etc/httpd
+  register: service_status
+
+- name: Ensure HTTPD service is stopped
+  when: service_status.stat.exists
+  service:
+    name: httpd
+    state: stopped
+
+- name: Create Apache Group
+  group:
+    name: "{{ apache_group }}"
+    system: yes
+    state: present
+    gid: "48"
+
+- name: Create Apache User
+  user:
+    name: "{{ apache_user }}"
+    comment: "Apache User"
+    uid: "48"
+    group: "{{ apache_group }}"
+    state: present
+
+- name: Allow Apache to listen on port 6666 for mod cluster
+  seport:
+    ports: 6666
+    proto: tcp
+    setype: http_port_t
+    state: present
+
+- name: Permit traffic on default zone for port 6666/tcp
+  firewalld:
+    port: 6666/tcp
+    permanent: True
+    state: enabled
+
+- name: Unarchive mod cluster
+  unarchive:
+    src: https://github.com/modcluster/mod_cluster/archive/refs/tags/2.0.1.Final.tar.gz
+    dest: /etc/httpd/modules
+    remote_src: yes
+
+- name: Copy Mod Cluster Config
+  copy:
+    src: "mod_cluster.conf"
+    dest: "/etc/httpd/conf.d/"
+
+- name: Remove Proxy Balancer Module
+  lineinfile:
+    state: present
+    path: "/etc/httpd/conf.modules.d/00-proxy.conf"
+    regexp: "LoadModule proxy_balancer_module modules/mod_proxy_balancer.so"
+    line: "#LoadModule proxy_balancer_module modules/mod_proxy_balancer.so"
+
+- name: Ensure Correct index.html is present
+  ansible.builtin.copy:
+    src: files/index.html
+    dest: /var/www/html/index.html
+
+- name: Enable httpd
+  service:
+    name: httpd
+    enabled: yes
+
+- name: Start httpd
+  service:
+    name: httpd
+    state: started
